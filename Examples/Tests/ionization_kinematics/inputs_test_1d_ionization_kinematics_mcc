@@ -1,0 +1,19 @@
+# base input parameters
+FILE = inputs_base_1d
+
+# Species: the argon atoms are a static background gas
+particles.species_names = electrons ar_ions
+
+# Collisions
+collisions.collision_names = coll_elec
+coll_elec.type = background_mcc
+coll_elec.species = electrons
+coll_elec.background_density = gas_density
+coll_elec.background_temperature = 300. # [K]
+coll_elec.scattering_processes = ionization
+coll_elec.ionization_cross_section = ../../../../warpx-data/MCC_cross_sections/Ar/ionization.dat
+coll_elec.ionization_energy = 15.7596112 # [eV]
+coll_elec.ionization_species = ar_ions
+coll_elec.ionization_energy_sharing = opb
+coll_elec.ionization_opb_B = 10. # [eV]
+coll_elec.ionization_scattering_angle_model = okhrimovskyy

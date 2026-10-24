@@ -1,0 +1,64 @@
+# In this test, a mono-energetic beam of electrons (energy beam_energy_eV, along +z)
+# crosses a gas of argon atoms at rest during a single time step, during which
+# about 10% of the electrons ionize the gas. The kinematics of the electron-impact
+# ionization events use the Opal-Peterson-Beaty energy sharing model and the
+# Okhrimovskyy scattering angle model. In the analysis script, we check that the
+# energies and angles of the scattered and ejected electrons follow these models.
+# The collision itself (DSMC or background MCC) is set up in the test-specific input files.
+
+#############################
+# Parameters
+my_constants.beam_energy_eV = 100. # [eV]
+my_constants.beam_gamma = 1. + beam_energy_eV*q_e/(m_e*clight**2)
+my_constants.beam_u = sqrt(beam_gamma**2 - 1.) # [-] normalized momentum gamma*beta
+my_constants.gas_density = 1.e22 # [m^-3]
+my_constants.ar_mass = 39.948*1.66053906660e-27 # [kg]
+
+#############################
+# Simulation time
+max_step = 1
+warpx.const_dt = 6.e-11
+
+#############################
+# Grid
+amr.n_cell = 16
+amr.max_level = 0
+amr.max_grid_size = 8
+geometry.dims = 1
+geometry.prob_lo = 0.
+geometry.prob_hi = 0.01
+
+boundary.field_lo = periodic
+boundary.field_hi = periodic
+boundary.particle_lo = periodic
+boundary.particle_hi = periodic
+
+#############################
+# Algorithms: no fields
+algo.maxwell_solver = none
+algo.particle_shape = 1
+
+#############################
+# Species (particles.species_names is set in the test-specific input files)
+electrons.charge = -q_e
+electrons.mass = m_e
+electrons.injection_style = NRandomPerCell
+electrons.num_particles_per_cell = 4000
+electrons.profile = constant
+electrons.density = 1.e14
+electrons.momentum_distribution_type = constant
+electrons.ux = 0.
+electrons.uy = 0.
+electrons.uz = beam_u
+
+ar_ions.charge = q_e
+ar_ions.mass = ar_mass
+ar_ions.injection_style = none
+
+#############################
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = none
+diag1.format = openpmd

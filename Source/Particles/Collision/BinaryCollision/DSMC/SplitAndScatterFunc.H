@@ -17,8 +17,12 @@
 #include "Utils/ParticleUtils.H"
 #include "Utils/ScatteringUtils.H"
 #include "Utils/WarpXAlgorithmSelection.H"
+#include "Utils/WarpXConst.H"
+
+#include <AMReX_Random.H>
 
 #include <array>
+#include <cmath>
 
 /**
  * \brief This class defines an operator to create product particles from DSMC
@@ -489,7 +493,7 @@ public:
                     uy3 = -mass_ratio * uy0;
                     uz3 = -mass_ratio * uz0;
                 }
-                else
+                else if (scattering_process.hasEqualSharingIsotropicIonization())
                 {
                     // Electron impact ionization (the incident particle is an electron).
                     // We use the following model: in the center-of-mass frame, the two
@@ -554,6 +558,90 @@ public:
                         uy2 = u_ion * scaled_uy_ion;
                         uz2 = u_ion * scaled_uz_ion;
                     }
+                }
+                else
+                {
+                    // Electron impact ionization (the incident particle is an electron), with the
+                    // energy sharing and scattering angle models selected for this process, following
+                    // Vahedi & Surendra, Comput. Phys. Commun. 87, 179 (1995). In the center-of-mass
+                    // frame, the energy left after ionization is divided between the scattered
+                    // (incident) and ejected electrons according to the energy sharing model. Both
+                    // electrons are deflected from the direction of the incident electron, by polar
+                    // angles sampled from the scattering angle model at their respective energies
+                    // and by uniformly distributed azimuthal angles. The ion takes the opposite of
+                    // the total electron momentum (conservation of momentum in COM). Finally, all
+                    // momenta are rescaled by a common factor so that the total kinetic energy,
+                    // including the (small) ion recoil, is E_out (conservation of energy).
+
+                    // The freed electron has the same mass as the incident electron (m0);
+                    // the ion is the heavier of the two products in slots 2 and 3.
+                    const amrex::ParticleReal m_ion = amrex::max(mass_slot2, mass_slot3);
+                    const auto m_ion_d = static_cast<double>(m_ion);
+
+                    // Kinetic energies of the ejected and scattered electrons
+                    constexpr auto q_e_d = PhysConst::q_e_v<double>;
+                    const double E_out_eV = E_out_d / q_e_d;
+                    const double E_ej_eV = scattering_process.getEjectedElectronEnergy(E_out_eV, engine);
+                    const double E_sc_eV = E_out_eV - E_ej_eV;
+
+                    // Unit vectors along the scattered and ejected electron momenta, obtained by
+                    // deflecting the direction of the incident electron
+                    // (use the z axis if the incident direction is undefined)
+                    const double u0_norm_d = std::sqrt(ux0_d*ux0_d + uy0_d*uy0_d + uz0_d*uz0_d);
+                    amrex::ParticleReal n_sc_x = 0._prt;
+                    amrex::ParticleReal n_sc_y = 0._prt;
+                    amrex::ParticleReal n_sc_z = 1._prt;
+                    if (u0_norm_d > 0.) {
+                        n_sc_x = static_cast<amrex::ParticleReal>(ux0_d/u0_norm_d);
+                        n_sc_y = static_cast<amrex::ParticleReal>(uy0_d/u0_norm_d);
+                        n_sc_z = static_cast<amrex::ParticleReal>(uz0_d/u0_norm_d);
+                    }
+                    amrex::ParticleReal n_ej_x = n_sc_x;
+                    amrex::ParticleReal n_ej_y = n_sc_y;
+                    amrex::ParticleReal n_ej_z = n_sc_z;
+                    const ScatteringAngleModel angle_model = scattering_process.m_scattering_angle_model;
+                    const amrex::ParticleReal phi_sc = 2.0_prt * MathConst::pi * amrex::Random(engine);
+                    const amrex::ParticleReal costh_sc = ParticleUtils::getRandomCosTheta(engine, angle_model,
+                        ScatteringUtils::AnisotropicCoefficientTable{}, static_cast<amrex::ParticleReal>(E_sc_eV), nullptr);
+                    ParticleUtils::rotateVector(n_sc_x, n_sc_y, n_sc_z, phi_sc, costh_sc);
+                    const amrex::ParticleReal phi_ej = 2.0_prt * MathConst::pi * amrex::Random(engine);
+                    const amrex::ParticleReal costh_ej = ParticleUtils::getRandomCosTheta(engine, angle_model,
+                        ScatteringUtils::AnisotropicCoefficientTable{}, static_cast<amrex::ParticleReal>(E_ej_eV), nullptr);
+                    ParticleUtils::rotateVector(n_ej_x, n_ej_y, n_ej_z, phi_ej, costh_ej);
+
+                    // Electron momenta before rescaling, and ion momentum from conservation of momentum
+                    const double p_sc_d = std::sqrt(2.0 * m0_d * E_sc_eV * q_e_d);
+                    const double p_ej_d = std::sqrt(2.0 * m0_d * E_ej_eV * q_e_d);
+                    const double p_ion_x_d = -(p_sc_d * n_sc_x + p_ej_d * n_ej_x);
+                    const double p_ion_y_d = -(p_sc_d * n_sc_y + p_ej_d * n_ej_y);
+                    const double p_ion_z_d = -(p_sc_d * n_sc_z + p_ej_d * n_ej_z);
+                    const double E_ion_d = 0.5 * (p_ion_x_d*p_ion_x_d + p_ion_y_d*p_ion_y_d + p_ion_z_d*p_ion_z_d) / m_ion_d;
+
+                    // Common rescaling factor such that E_sc + E_ej + E_ion = E_out,
+                    // where E_sc + E_ej = E_out before rescaling
+                    const double scale_d = (E_out_d > 0.) ? std::sqrt(E_out_d / (E_out_d + E_ion_d)) : 0.;
+                    const auto u_sc = static_cast<amrex::ParticleReal>(scale_d * p_sc_d / m0_d);
+                    const auto u_ej = static_cast<amrex::ParticleReal>(scale_d * p_ej_d / m0_d);
+
+                    // Assign the normalized momenta (still in the COM frame; the surrounding code
+                    // transforms them back to the lab frame). The incident electron is in
+                    // slot 0; the two products of the ionized target (slots 2 and 3) are
+                    // one electron and one ion, the electron being the lighter of the two.
+                    ux0 = u_sc * n_sc_x;
+                    uy0 = u_sc * n_sc_y;
+                    uz0 = u_sc * n_sc_z;
+                    auto& ux_ej = (mass_slot2 < mass_slot3) ? ux2 : ux3;
+                    auto& uy_ej = (mass_slot2 < mass_slot3) ? uy2 : uy3;
+                    auto& uz_ej = (mass_slot2 < mass_slot3) ? uz2 : uz3;
+                    auto& ux_ion = (mass_slot2 < mass_slot3) ? ux3 : ux2;
+                    auto& uy_ion = (mass_slot2 < mass_slot3) ? uy3 : uy2;
+                    auto& uz_ion = (mass_slot2 < mass_slot3) ? uz3 : uz2;
+                    ux_ej = u_ej * n_ej_x;
+                    uy_ej = u_ej * n_ej_y;
+                    uz_ej = u_ej * n_ej_z;
+                    ux_ion = static_cast<amrex::ParticleReal>(scale_d * p_ion_x_d / m_ion_d);
+                    uy_ion = static_cast<amrex::ParticleReal>(scale_d * p_ion_y_d / m_ion_d);
+                    uz_ion = static_cast<amrex::ParticleReal>(scale_d * p_ion_z_d / m_ion_d);
                 }
 
                 // transform back to labframe

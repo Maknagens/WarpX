@@ -175,6 +175,11 @@ ParticleCreationFunc::ParticleCreationFunc (const std::string& collision_name,
         || BinaryCollisionUtils::is_two_product_fusion_type(m_collision_type))
     {
         pp_collision_name.query_enum_case_insensitive("scattering_angle_model", m_scattering_angle_model);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_scattering_angle_model != ScatteringAngleModel::VahediSurendra &&
+            m_scattering_angle_model != ScatteringAngleModel::Okhrimovskyy,
+            "scattering_angle_model = vahedisurendra or okhrimovskyy is only supported "
+            "for DSMC/MCC ionization, not for nuclear fusion.");
     }
 
     // Optionally load an energy-dependent table of coefficients that

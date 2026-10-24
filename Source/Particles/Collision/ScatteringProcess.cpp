@@ -96,6 +96,18 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
 #endif
 }
 
+void
+ScatteringProcess::setIonizationEnergySharing (const IonizationEnergySharing energy_sharing,
+                                               const amrex::ParticleReal opb_B)
+{
+    m_exe_h.m_energy_sharing = energy_sharing;
+    m_exe_h.m_opb_B = opb_B;
+#ifdef AMREX_USE_GPU
+    m_exe_d.m_energy_sharing = energy_sharing;
+    m_exe_d.m_opb_B = opb_B;
+#endif
+}
+
 ScatteringProcessType
 ScatteringProcess::parseProcessType(const std::string& scattering_process)
 {

@@ -58,6 +58,25 @@ DSMCFunc::DSMCFunc (
                 amrex::Abort("The first species in " + collision_name + ".product_species must be an electron.");
             }
 
+            // The energy sharing and scattering angle models of ionization describe the two
+            // electrons leaving an electron-impact ionization event. Ion-impact ionization
+            // uses a separate (collinear) model, so these options cannot be applied to it.
+            if (!process.executor().hasEqualSharingIsotropicIonization()) {
+                amrex::Vector<std::string> species_names;
+                pp_collision_name.getarr("species", species_names);
+                std::string target_species;
+                pp_collision_name.query("ionization_target_species", target_species);
+                const std::string& incident_species_name =
+                    (species_names[0] == target_species) ? species_names[1] : species_names[0];
+                auto const& incident_species = mypc->GetParticleContainerFromName(incident_species_name);
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    incident_species.getMass() <= 2._prt * PhysConst::m_e,
+                    collision_name + ".ionization_energy_sharing and " + collision_name +
+                    ".ionization_scattering_angle_model are only supported for electron-impact "
+                    "ionization, but the incident species " + incident_species_name +
+                    " is not an electron species.");
+            }
+
             // TODO: add a check that the ionization species has the same mass
             // (and a positive charge), compared to the target species
         } else if (process.type() == ScatteringProcessType::CHARGE_EXCHANGE) {

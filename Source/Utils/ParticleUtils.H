@@ -233,7 +233,9 @@ namespace ParticleUtils {
      * @param[in] engine the random engine
      * @param[in] scattering_angle_model the scattering angle distribution to use
      * @param[in] anisotropic_coefficients table of coefficients for anisotropic scattering
-     * @param[in] collision_energy center-of-mass collision energy in eV
+     * @param[in] collision_energy center-of-mass collision energy in eV (for the
+     *            electron-scattering models VahediSurendra and Okhrimovskyy: the
+     *            kinetic energy of the scattered electron in eV)
      * @param[out] energy_range_status per-event status: -1 below, 0 within, 1 above
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -255,6 +257,24 @@ namespace ParticleUtils {
         }
         else if (scattering_angle_model == ScatteringAngleModel::Legendre) {
             cos_theta = ScatteringUtils::sampleCosTheta(anisotropic_coefficients, collision_energy, amrex::Random(engine), energy_range_status);
+        }
+        else if (scattering_angle_model == ScatteringAngleModel::VahediSurendra) {
+            // Vahedi & Surendra, Comput. Phys. Commun. 87, 179 (1995), Eq. (9), with the
+            // electron energy in eV; tends to isotropic scattering at low energy
+            const double R = amrex::Random(engine);
+            const auto energy = static_cast<double>(collision_energy);
+            const double cos_theta_d = (energy > 1.e-6) ?
+                (2.0 + energy - 2.0*std::pow(1.0 + energy, R)) / energy : 1.0 - 2.0*R;
+            cos_theta = static_cast<amrex::ParticleReal>(amrex::max(-1.0, amrex::min(1.0, cos_theta_d)));
+        }
+        else if (scattering_angle_model == ScatteringAngleModel::Okhrimovskyy) {
+            // Okhrimovskyy et al., Phys. Rev. E 65, 037402 (2002), with xi = 4 eps / (1 + 4 eps)
+            // and eps the electron energy in atomic units (Hartree)
+            constexpr double hartree_eV = 27.211386245988;
+            const double R = amrex::Random(engine);
+            const double energy_au = static_cast<double>(collision_energy) / hartree_eV;
+            const double cos_theta_d = 1.0 - 2.0*R / (1.0 + 8.0*energy_au*(1.0 - R));
+            cos_theta = static_cast<amrex::ParticleReal>(amrex::max(-1.0, amrex::min(1.0, cos_theta_d)));
         }
         return cos_theta;
     }

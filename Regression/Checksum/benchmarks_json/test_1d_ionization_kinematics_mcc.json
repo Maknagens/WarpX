@@ -1,0 +1,20 @@
+{
+  "ar_ions": {
+    "particle_momentum_x": 7.41603487362999e-20,
+    "particle_momentum_y": 7.221541806632793e-20,
+    "particle_momentum_z": 7.354819474957946e-20,
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 28.04294962163952,
+    "particle_weight": 86156250000.00002
+  },
+  "electrons": {
+    "particle_momentum_x": 1.1283871083063079e-20,
+    "particle_momentum_y": 1.0950585061709953e-20,
+    "particle_momentum_z": 3.425982063214492e-19,
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 348.2663114117484,
+    "particle_weight": 1086156250000.0002
+  }
+}

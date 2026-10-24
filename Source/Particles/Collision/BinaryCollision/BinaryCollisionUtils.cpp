@@ -157,8 +157,44 @@ namespace BinaryCollisionUtils{
             scattering_angle_error_msg += scattering_process;
             scattering_angle_error_msg += "_scattering_angle_model = legendre is not supported for DSMC/MCC collisions.";
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(scattering_angle_model != ScatteringAngleModel::Legendre, scattering_angle_error_msg);
+
+            // The energy-dependent electron scattering models apply to the two electrons that
+            // leave an electron-impact ionization event; conversely, for ionization, both
+            // electrons are emitted with the same angular model, which must be one of these
+            // or isotropic.
+            const bool is_electron_angle_model =
+                scattering_angle_model == ScatteringAngleModel::VahediSurendra ||
+                scattering_angle_model == ScatteringAngleModel::Okhrimovskyy;
+            if (process_type == ScatteringProcessType::IONIZATION) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    is_electron_angle_model || scattering_angle_model == ScatteringAngleModel::Isotropic,
+                    collision_name + "." + scattering_process + "_scattering_angle_model must be "
+                    "isotropic, vahedisurendra or okhrimovskyy.");
+            } else {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    !is_electron_angle_model,
+                    collision_name + "." + scattering_process + "_scattering_angle_model = "
+                    "vahedisurendra or okhrimovskyy is only supported for ionization.");
+            }
+
             scattering_processes.push_back(ScatteringProcess(
                 scattering_process, cross_section_file, energy, scattering_angle_model));
+
+            // For ionization, the division of the remaining energy between the scattered
+            // and ejected electrons is controlled by `<process>_energy_sharing`.
+            if (process_type == ScatteringProcessType::IONIZATION) {
+                auto energy_sharing = IonizationEnergySharing::Default;
+                pp_collision_name.query_enum_case_insensitive(
+                    scattering_process + "_energy_sharing", energy_sharing);
+                amrex::ParticleReal opb_B = 0._prt;
+                if (energy_sharing == IonizationEnergySharing::OPB) {
+                    const std::string kw_opb_B = scattering_process + "_opb_B";
+                    utils::parser::getWithParser(pp_collision_name, kw_opb_B.c_str(), opb_B);
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(opb_B > 0._prt,
+                        collision_name + "." + kw_opb_B + " must be positive.");
+                }
+                scattering_processes.back().setIonizationEnergySharing(energy_sharing, opb_B);
+            }
         }
 
         return scattering_processes;

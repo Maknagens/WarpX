@@ -15,9 +15,11 @@
 #include <AMReX_GpuContainers.H>
 #include <AMReX_Math.H>
 #include <AMReX_REAL.H>
+#include <AMReX_Random.H>
 #include <AMReX_RandomEngine.H>
 #include <AMReX_Vector.H>
 
+#include <cmath>
 #include <string>
 
 enum class ScatteringProcessType {
@@ -107,6 +109,42 @@ public:
             }
         }
 
+        /** Sample the kinetic energy of the electron ejected by an electron-impact
+         * ionization event, according to the energy sharing model of this process.
+         * The energy of the scattered (incident) electron is then E_out_eV minus
+         * the returned value.
+         *
+         * @param E_out_eV energy left after ionization (incident electron energy minus the
+         *        ionization energy) in eV, to be divided between the two electrons
+         * @param engine the random engine
+         * @return the kinetic energy of the ejected electron in eV, in [0, E_out_eV/2]
+         */
+        [[nodiscard]]
+        AMREX_GPU_HOST_DEVICE AMREX_INLINE
+        double getEjectedElectronEnergy (double E_out_eV, amrex::RandomEngine const& engine) const
+        {
+            if (m_energy_sharing == IonizationEnergySharing::OPB) {
+                // Invert the cumulative distribution of the Opal-Peterson-Beaty differential
+                // cross section, sigma(E_ej) ~ 1 / (1 + (E_ej/B)^2), on [0, E_out_eV/2];
+                // see Vahedi & Surendra, Comput. Phys. Commun. 87, 179 (1995), Eq. (20)
+                const auto B = static_cast<double>(m_opb_B);
+                const double R = amrex::Random(engine);
+                const double E_ej_eV = B * std::tan(R * std::atan(0.5 * E_out_eV / B));
+                return amrex::max(0.0, amrex::min(E_ej_eV, 0.5 * E_out_eV));
+            }
+            return 0.5 * E_out_eV;
+        }
+
+        /** True if electron-impact ionization uses the original kinematics model of WarpX:
+         * equal energy sharing and isotropic scattering of both electrons. **/
+        [[nodiscard]]
+        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+        bool hasEqualSharingIsotropicIonization () const
+        {
+            return (m_energy_sharing == IonizationEnergySharing::Equal) &&
+                   (m_scattering_angle_model == ScatteringAngleModel::Isotropic);
+        }
+
         amrex::ParticleReal* m_energies_data = nullptr;
         amrex::ParticleReal* m_sigmas_data = nullptr;
         int m_grid_size = 0;
@@ -117,6 +155,10 @@ public:
         /** True if this process creates new product particles (ionization, charge exchange,
          *  two-product reaction); false for purely scattering processes (elastic, excitation). **/
         bool m_produces_products = false;
+        /** For ionization: how the remaining energy is divided between the two electrons **/
+        IonizationEnergySharing m_energy_sharing = IonizationEnergySharing::Equal;
+        /** For ionization with Opal-Peterson-Beaty energy sharing: the B parameter in eV **/
+        amrex::ParticleReal m_opb_B = 0;
     };
 
     [[nodiscard]]
@@ -139,6 +181,17 @@ public:
     [[nodiscard]] amrex::ParticleReal getEnergyInputStep () const { return m_exe_h.m_dE; }
 
     [[nodiscard]] ScatteringProcessType type () const { return m_exe_h.m_type; }
+    [[nodiscard]] ScatteringAngleModel getScatteringAngleModel () const { return m_exe_h.m_scattering_angle_model; }
+
+    /** Set how the energy left after an electron-impact ionization event is divided
+     * between the scattered and ejected electrons.
+     *
+     * @param energy_sharing the energy sharing model
+     * @param opb_B the B parameter (in eV) of the Opal-Peterson-Beaty model; only used
+     *        if energy_sharing is IonizationEnergySharing::OPB
+     */
+    void setIonizationEnergySharing (IonizationEnergySharing energy_sharing,
+                                     amrex::ParticleReal opb_B);
 
     static
     ScatteringProcessType parseProcessType(const std::string& process);

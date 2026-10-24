@@ -132,15 +132,16 @@ public:
     *
     * The transform is responsible for appropriately decreasing the kinetic
     * energy of the colliding particle and assigning appropriate velocities
-    * to the two newly created particles. To this end the energy cost of
-    * ionization is passed to the constructor as well as the mass of the
-    * colliding species and the standard deviation of the ion velocity
+    * to the two newly created particles. To this end the ionization process
+    * (which holds the energy cost of ionization, the energy sharing model and
+    * the scattering angle model) is passed to the constructor as well as the
+    * mass of the colliding species and the standard deviation of the ion velocity
     * (normalized temperature).
     * Note that the mass and energy quantities have to be stored as doubles to
     * ensure accurate energy calculations (otherwise errors occur with single
     * or mixed precision builds of WarpX).
     *
-    * @param[in] energy_cost energy cost of ionization
+    * @param[in] mcc_process the ScatteringProcess object associated with the ionization
     * @param[in] mass1 mass of the colliding species
     * @param[in] sqrt_kb_m value of sqrt(kB/m), where kB is Boltzmann's constant
                  and m is the background neutral mass
@@ -149,10 +150,10 @@ public:
     * @param[in] t the current simulation time
     */
     ImpactIonizationTransformFunc(
-        amrex::ParticleReal energy_cost, double mass1, amrex::ParticleReal sqrt_kb_m,
+        ScatteringProcess const& mcc_process, double mass1, amrex::ParticleReal sqrt_kb_m,
         amrex::ParserExecutor<4> const& T_a_func, amrex::Real t
-    ) :  m_energy_cost(energy_cost), m_mass1(mass1),
-         m_sqrt_kb_m(sqrt_kb_m), m_T_a_func(T_a_func), m_t(t) { }
+    ) :  m_mcc_process(mcc_process.executor()), m_energy_cost(mcc_process.getEnergyPenalty()),
+         m_mass1(mass1), m_sqrt_kb_m(sqrt_kb_m), m_T_a_func(T_a_func), m_t(t) { }
 
     /**
     * \brief Functor call. It determines the properties of the generated pair
@@ -204,18 +205,73 @@ public:
         constexpr auto eV = PhysConst::q_e;
         E_coll = Algorithms::KineticEnergy<double>(ux, uy, uz, m_mass1)/eV;
 
-        // each electron gets half the energy (could change this later)
-        const auto E_out = static_cast<amrex::ParticleReal>((E_coll - m_energy_cost) / 2.0_prt * eV);
-
         // precalculate often used value
         constexpr auto c2 = PhysConst::c2;
         const auto mc2 = m_mass1*c2;
 
-        const amrex::ParticleReal up = sqrt(E_out * (E_out + 2.0_prt*mc2) / c2) / m_mass1;
+        if (m_mcc_process.hasEqualSharingIsotropicIonization())
+        {
+            // each electron gets half the energy
+            const auto E_out = static_cast<amrex::ParticleReal>((E_coll - m_energy_cost) / 2.0_prt * eV);
 
-        // isotropically scatter electrons
-        ParticleUtils::RandomizeVelocity(ux, uy, uz, up, engine);
-        ParticleUtils::RandomizeVelocity(e_ux, e_uy, e_uz, up, engine);
+            const amrex::ParticleReal up = sqrt(E_out * (E_out + 2.0_prt*mc2) / c2) / m_mass1;
+
+            // isotropically scatter electrons
+            ParticleUtils::RandomizeVelocity(ux, uy, uz, up, engine);
+            ParticleUtils::RandomizeVelocity(e_ux, e_uy, e_uz, up, engine);
+        }
+        else
+        {
+            // Divide the energy left after ionization between the scattered (incident) and
+            // ejected electrons according to the energy sharing model, and deflect both
+            // electrons from the direction of the incident electron by polar angles sampled
+            // from the scattering angle model at their respective energies, following
+            // Vahedi & Surendra, Comput. Phys. Commun. 87, 179 (1995). As for the ion
+            // created below, the recoil of the background neutral is neglected.
+            const double E_out_eV = amrex::max(E_coll - static_cast<double>(m_energy_cost), 0.0);
+            const double E_ej_eV = m_mcc_process.getEjectedElectronEnergy(E_out_eV, engine);
+            const double E_sc_eV = E_out_eV - E_ej_eV;
+
+            // Unit vectors along the scattered and ejected electron momenta, obtained by
+            // deflecting the direction of the incident electron
+            // (use the z axis if the incident direction is undefined)
+            const auto ux_d = static_cast<double>(ux);
+            const auto uy_d = static_cast<double>(uy);
+            const auto uz_d = static_cast<double>(uz);
+            const double u_norm_d = std::sqrt(ux_d*ux_d + uy_d*uy_d + uz_d*uz_d);
+            ParticleReal n_sc_x = 0._prt;
+            ParticleReal n_sc_y = 0._prt;
+            ParticleReal n_sc_z = 1._prt;
+            if (u_norm_d > 0.) {
+                n_sc_x = static_cast<ParticleReal>(ux_d/u_norm_d);
+                n_sc_y = static_cast<ParticleReal>(uy_d/u_norm_d);
+                n_sc_z = static_cast<ParticleReal>(uz_d/u_norm_d);
+            }
+            ParticleReal n_ej_x = n_sc_x;
+            ParticleReal n_ej_y = n_sc_y;
+            ParticleReal n_ej_z = n_sc_z;
+            const ScatteringAngleModel angle_model = m_mcc_process.m_scattering_angle_model;
+            const ParticleReal phi_sc = 2.0_prt * MathConst::pi * Random(engine);
+            const ParticleReal costh_sc = ParticleUtils::getRandomCosTheta(engine, angle_model,
+                ScatteringUtils::AnisotropicCoefficientTable{}, static_cast<ParticleReal>(E_sc_eV), nullptr);
+            ParticleUtils::rotateVector(n_sc_x, n_sc_y, n_sc_z, phi_sc, costh_sc);
+            const ParticleReal phi_ej = 2.0_prt * MathConst::pi * Random(engine);
+            const ParticleReal costh_ej = ParticleUtils::getRandomCosTheta(engine, angle_model,
+                ScatteringUtils::AnisotropicCoefficientTable{}, static_cast<ParticleReal>(E_ej_eV), nullptr);
+            ParticleUtils::rotateVector(n_ej_x, n_ej_y, n_ej_z, phi_ej, costh_ej);
+
+            // normalized momenta (gamma*v) of the two electrons, from their kinetic energies
+            const double E_sc = E_sc_eV * eV;
+            const double E_ej = E_ej_eV * eV;
+            const auto u_sc = static_cast<ParticleReal>(sqrt(E_sc * (E_sc + 2.0*mc2) / c2) / m_mass1);
+            const auto u_ej = static_cast<ParticleReal>(sqrt(E_ej * (E_ej + 2.0*mc2) / c2) / m_mass1);
+            ux = u_sc * n_sc_x;
+            uy = u_sc * n_sc_y;
+            uz = u_sc * n_sc_z;
+            e_ux = u_ej * n_ej_x;
+            e_uy = u_ej * n_ej_y;
+            e_uz = u_ej * n_ej_z;
+        }
 
         // get velocities for the ion from a Maxwellian distribution
         i_ux = ion_vel_std * RandomNormal(0_prt, 1.0_prt, engine);
@@ -224,6 +280,7 @@ public:
     }
 
 private:
+    ScatteringProcess::Executor m_mcc_process;
     amrex::ParticleReal m_energy_cost;
     double m_mass1;
     amrex::ParticleReal m_sqrt_kb_m;

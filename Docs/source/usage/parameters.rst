@@ -3491,16 +3491,64 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :optional:
 
     Only for ``dsmc`` and ``background_mcc``, and only for ``elasticX``, ``excitationX``,
-    ``charge_exchange`` and ``two_product_reaction``.
+    ``charge_exchange``, ``two_product_reaction`` and ``ionization``.
     The model used to determine the scattering angle of the products
-    in the center-of-mass frame. The possible values are ``isotropic``, ``forward`` and ``backward``.
-    The default is ``isotropic`` for ``elasticX`` and ``excitationX``, and ``forward`` for
+    in the center-of-mass frame. The possible values are ``isotropic``, ``forward`` and ``backward``
+    (and, for ``ionization`` only, ``vahedisurendra`` and ``okhrimovskyy``).
+    The default is ``isotropic`` for ``elasticX``, ``excitationX`` and ``ionization``, and ``forward`` for
     ``charge_exchange`` and ``two_product_reaction``.
     With ``isotropic``, the scattering angle is drawn from an isotropic distribution.
     With ``forward``, the scattering angle is set to zero, i.e. the products keep the same direction
     as the incident particle (in the center of mass frame).
     With ``backward``, the scattering angle is set to :math:`\pi`, i.e. the products are emitted in
     the opposite direction of the incident particle (in the center of mass frame).
+
+    For ``ionization``, the possible values are ``isotropic``, ``vahedisurendra`` and ``okhrimovskyy``,
+    and they apply to electron-impact ionization only.
+    With ``isotropic``, both electrons leaving the ionization event (the scattered incident electron
+    and the ejected electron) are emitted isotropically.
+    With ``vahedisurendra`` and ``okhrimovskyy``, each of the two electrons is deflected from the
+    direction of the incident electron by a polar angle :math:`\chi` that depends on its own
+    kinetic energy :math:`\varepsilon` after the event, and by a uniformly distributed azimuthal
+    angle, following V. Vahedi and M. Surendra, Comput. Phys. Commun. **87**, 179 (1995).
+    With ``vahedisurendra``, :math:`\cos\chi = (2 + \varepsilon - 2(1+\varepsilon)^R)/\varepsilon`
+    (Eq. (9) of Vahedi and Surendra, with :math:`\varepsilon` in eV and :math:`R` a uniform random number in :math:`[0,1]`).
+    With ``okhrimovskyy``, :math:`\cos\chi = 1 - 2R(1-\xi)/(1+\xi(1-2R))` with
+    :math:`\xi = 4\varepsilon/(1+4\varepsilon)` and :math:`\varepsilon` in atomic units (Hartree),
+    following A. Okhrimovskyy et al., Phys. Rev. E **65**, 037402 (2002).
+    Both models give mostly forward scattering for energetic electrons and nearly isotropic scattering
+    for low-energy electrons.
+    With ``dsmc``, the ion takes the recoil momentum, and the electron momenta are rescaled so that
+    energy is conserved exactly. With ``background_mcc``, the ion is drawn from the background gas
+    velocity distribution, as with ``isotropic``.
+
+.. pp:param:: <collision_name>.ionization_energy_sharing
+    :type: ``string``
+    :optional:
+
+    Only for ``dsmc`` and ``background_mcc``, for electron-impact ``ionization``.
+    The model used to divide the energy left after ionization,
+    :math:`\varepsilon_{inc} - \varepsilon_{ion}` (with :math:`\varepsilon_{inc}` the energy of the
+    incident electron and :math:`\varepsilon_{ion}` the value of
+    :pp:param:`<collision_name>.<scattering_process>_energy`), between the scattered (incident)
+    and ejected electrons. The possible values are ``equal`` (default) and ``opb``.
+    With ``equal``, the remaining energy is divided equally between the two electrons.
+    With ``opb``, the energy of the ejected electron :math:`\varepsilon_{ej}` is sampled from the
+    differential cross section :math:`\sigma(\varepsilon_{inc}, \varepsilon_{ej}) \propto 1/(1 + (\varepsilon_{ej}/B)^2)`
+    of C. B. Opal, W. K. Peterson and E. C. Beaty, J. Chem. Phys. **55**, 4100 (1971), restricted to
+    :math:`[0, (\varepsilon_{inc} - \varepsilon_{ion})/2]`, as in Eq. (20) of Vahedi and Surendra,
+    Comput. Phys. Commun. **87**, 179 (1995):
+    :math:`\varepsilon_{ej} = B\tan\left[R\arctan\left((\varepsilon_{inc} - \varepsilon_{ion})/(2B)\right)\right]`.
+    The scattered electron keeps the rest of the energy. In this model, most ejected electrons have
+    an energy of the order of :math:`B` or less, and the scattered electron keeps most of the energy.
+
+.. pp:param:: <collision_name>.ionization_opb_B
+    :type: ``float`` in eV
+
+    Required if :pp:param:`<collision_name>.ionization_energy_sharing` is ``opb``.
+    The gas-dependent parameter :math:`B` of the Opal-Peterson-Beaty model, in eV
+    (e.g. :math:`B \approx 10` eV for argon, for incident energies up to about 70 eV, according to
+    Vahedi and Surendra). Values for other gases are tabulated in Opal et al. (1971).
 
 .. pp:param:: <collision_name>.ionization_species
     :type: ``float``

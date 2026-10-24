@@ -457,7 +457,7 @@ void BackgroundMCCCollision::doBackgroundIonization
         const auto np_ion = ion_tile.numParticles();
 
         auto Transform = ImpactIonizationTransformFunc(
-                                                       m_ionization_processes[0].getEnergyPenalty(),
+                                                       m_ionization_processes[0],
                                                        m_mass1, sqrt_kb_m, m_background_temperature_func, t
                                                        );
 

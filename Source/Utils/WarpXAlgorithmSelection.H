@@ -201,7 +201,18 @@ AMREX_ENUM(ScatteringAngleModel,
            Backward,   /**< Scattering angle is pi, i.e., products have the opposite direction of the incident particle in the center of mass frame */
            Isotropic,  /**< Scattering angle is random, i.e., products are scattered isotropically in the center of mass frame */
            Legendre, /**< Scattering angle is sampled from a Legendre expansion */
+           VahediSurendra, /**< Energy-dependent electron scattering angle from Vahedi & Surendra, Comput. Phys. Commun. 87, 179 (1995), Eq. (9) */
+           Okhrimovskyy, /**< Energy-dependent electron scattering angle from Okhrimovskyy et al., Phys. Rev. E 65, 037402 (2002) */
            Default = Isotropic  /**< Isotropic */
+);
+
+/** \brief For electron-impact ionization, the strategy to divide the energy left after
+ *  ionization between the scattered (primary) and ejected (secondary) electrons */
+AMREX_ENUM(IonizationEnergySharing,
+           Equal, /**< The remaining energy is divided equally between the two electrons */
+           OPB,   /**< The ejected electron energy is sampled from the Opal-Peterson-Beaty
+                       differential cross section, Opal et al., J. Chem. Phys. 55, 4100 (1971) */
+           Default = Equal
 );
 
 /** \brief Format of the Legendre coefficients used for anisotropic fusion angular distributions */
