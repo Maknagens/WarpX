@@ -50,6 +50,19 @@ expression reduces to the classical equation
 :math:`E_{coll} = \frac{1}{2}\frac{Mm}{M+m} u^2`. The collision cross-sections
 for all scattering processes are evaluated at the energy as calculated above.
 
+.. note::
+
+   The collision frequency of a process, :math:`\nu = n \sigma(E_{coll}) v`, must be consistent
+   with the angular distribution used for its scattering. For elastic scattering with the default
+   ``isotropic`` angle model, use the **momentum-transfer** cross section
+   :math:`\sigma_m = \int (1-\cos\chi)\, \frac{d\sigma}{d\Omega}\, d\Omega`, so that the rate of
+   momentum loss is correct. With an anisotropic, energy-dependent angle model
+   (``vahedisurendra`` or ``okhrimovskyy``), use the **total** elastic cross section instead:
+   these models are mostly forward-scattering, so with the momentum-transfer cross section
+   (which is smaller than the total one) the electrons would scatter too little.
+   Cross-section sets (e.g. on LXCat) often provide only the momentum-transfer cross section for
+   elastic scattering; check which one a data file contains.
+
 Once a particle is selected for a specific collision process, that process determines how the particle is scattered as outlined below.
 
 .. _multiphysics-collisions-pulseddecay:
@@ -106,8 +119,11 @@ with the neutral velocity and vice-versa.
 Elastic scattering
 ^^^^^^^^^^^^^^^^^^
 
-The ``elastic`` option uses isotropic scattering, i.e., with a differential
-cross section that is independent of angle.
+By default, the ``elastic`` option uses isotropic scattering, i.e., with a differential
+cross section that is independent of angle. For electrons, the energy-dependent
+anisotropic models ``vahedisurendra`` and ``okhrimovskyy`` can be selected instead
+(see :pp:param:`<collision_name>.<scattering_process>_scattering_angle_model`); the
+cross section to provide then differs (see the note on collision frequencies above).
 This scattering process as well as the ones below that relate to it, are all
 performed in the center-of-momentum (COM) frame. Designating the COM velocity of
 the particle as :math:`\boldsymbol{u}_c` and its labframe velocity as :math:`\boldsymbol{u}_l`,

@@ -142,6 +142,15 @@ namespace {
         const double E_kin_star_d = amrex::max(std::sqrt(E_star_sq_pos_d) - E_rest_in_d, 0.0);
         constexpr double joule_to_eV_d = 1.0 / static_cast<double>(PhysConst::q_e);
         const auto E_kin_star_eV = static_cast<amrex::ParticleReal>(E_kin_star_d * joule_to_eV_d);
+        // The energy-dependent electron scattering models are instead evaluated at the
+        // kinetic energy after the reaction, i.e. after the energy loss of an inelastic
+        // process, as in Vahedi & Surendra, Comput. Phys. Commun. 87, 179 (1995).
+        const bool is_electron_angle_model =
+            scattering_angle_model == ScatteringAngleModel::VahediSurendra ||
+            scattering_angle_model == ScatteringAngleModel::Okhrimovskyy;
+        const auto E_angle_eV = is_electron_angle_model ?
+            static_cast<amrex::ParticleReal>(amrex::max(E_star_f_d - E_rest_out_d, 0.0) * joule_to_eV_d) :
+            E_kin_star_eV;
 
         // Square of the norm of the momentum of the products in the center of mass frame
         // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle
@@ -216,7 +225,7 @@ namespace {
         // If the incident direction is undefined, fall back to isotropic scattering.
         const auto local_scattering_angle_model = has_incident_direction ? scattering_angle_model : ScatteringAngleModel::Isotropic;
         const amrex::ParticleReal phi = 2.0_prt * MathConst::pi * amrex::Random(engine);
-        const amrex::ParticleReal costh = ParticleUtils::getRandomCosTheta(engine, local_scattering_angle_model, anisotropic_coefficients, E_kin_star_eV, energy_range_status);
+        const amrex::ParticleReal costh = ParticleUtils::getRandomCosTheta(engine, local_scattering_angle_model, anisotropic_coefficients, E_angle_eV, energy_range_status);
         ParticleUtils::rotateVector(n1x_star_out, n1y_star_out, n1z_star_out, phi, costh);
 
         // Scale the scattered direction to the outgoing COM momentum magnitude.

@@ -3494,7 +3494,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     ``charge_exchange``, ``two_product_reaction`` and ``ionization``.
     The model used to determine the scattering angle of the products
     in the center-of-mass frame. The possible values are ``isotropic``, ``forward`` and ``backward``
-    (and, for ``ionization`` only, ``vahedisurendra`` and ``okhrimovskyy``).
+    (and, for ``elasticX``, ``excitationX`` and ``ionization``, ``vahedisurendra`` and ``okhrimovskyy``).
     The default is ``isotropic`` for ``elasticX``, ``excitationX`` and ``ionization``, and ``forward`` for
     ``charge_exchange`` and ``two_product_reaction``.
     With ``isotropic``, the scattering angle is drawn from an isotropic distribution.
@@ -3503,14 +3503,13 @@ Details about the collision models can be found in the :ref:`theory section <mul
     With ``backward``, the scattering angle is set to :math:`\pi`, i.e. the products are emitted in
     the opposite direction of the incident particle (in the center of mass frame).
 
-    For ``ionization``, the possible values are ``isotropic``, ``vahedisurendra`` and ``okhrimovskyy``,
-    and they apply to electron-impact ionization only.
-    With ``isotropic``, both electrons leaving the ionization event (the scattered incident electron
-    and the ejected electron) are emitted isotropically.
-    With ``vahedisurendra`` and ``okhrimovskyy``, each of the two electrons is deflected from the
-    direction of the incident electron by a polar angle :math:`\chi` that depends on its own
-    kinetic energy :math:`\varepsilon` after the event, and by a uniformly distributed azimuthal
-    angle, following V. Vahedi and M. Surendra, Comput. Phys. Commun. **87**, 179 (1995).
+    ``vahedisurendra`` and ``okhrimovskyy`` are energy-dependent models of the scattering of electrons
+    by atoms or molecules, following V. Vahedi and M. Surendra, Comput. Phys. Commun. **87**, 179 (1995),
+    who use them for elastic, excitation and ionization collisions. They require one of the colliding
+    species to be an electron species. The electron is deflected from its incident direction by a
+    polar angle :math:`\chi` that depends on its kinetic energy :math:`\varepsilon` after the
+    collision (i.e. after the energy loss of ``excitationX`` and ``ionization``), and by a uniformly
+    distributed azimuthal angle.
     With ``vahedisurendra``, :math:`\cos\chi = (2 + \varepsilon - 2(1+\varepsilon)^R)/\varepsilon`
     (Eq. (9) of Vahedi and Surendra, with :math:`\varepsilon` in eV and :math:`R` a uniform random number in :math:`[0,1]`).
     With ``okhrimovskyy``, :math:`\cos\chi = 1 - 2R(1-\xi)/(1+\xi(1-2R))` with
@@ -3518,6 +3517,17 @@ Details about the collision models can be found in the :ref:`theory section <mul
     following A. Okhrimovskyy et al., Phys. Rev. E **65**, 037402 (2002).
     Both models give mostly forward scattering for energetic electrons and nearly isotropic scattering
     for low-energy electrons.
+    For ``elasticX``, note that the cross section should then be the total elastic cross section, and not
+    the momentum-transfer cross section that is commonly used with isotropic scattering
+    (with forward-peaked scattering, the momentum-transfer cross section underestimates the collision
+    rate).
+
+    For ``ionization``, the possible values are ``isotropic``, ``vahedisurendra`` and ``okhrimovskyy``,
+    and they apply to electron-impact ionization only.
+    With ``isotropic``, both electrons leaving the ionization event (the scattered incident electron
+    and the ejected electron) are emitted isotropically.
+    With ``vahedisurendra`` and ``okhrimovskyy``, each of the two electrons is deflected from the
+    direction of the incident electron as described above, at its own kinetic energy after the event.
     With ``dsmc``, the ion takes the recoil momentum, and the electron momenta are rescaled so that
     energy is conserved exactly. With ``background_mcc``, the ion is drawn from the background gas
     velocity distribution, as with ``isotropic``.

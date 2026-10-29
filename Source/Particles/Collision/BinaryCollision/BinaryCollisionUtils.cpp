@@ -158,10 +158,9 @@ namespace BinaryCollisionUtils{
             scattering_angle_error_msg += "_scattering_angle_model = legendre is not supported for DSMC/MCC collisions.";
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(scattering_angle_model != ScatteringAngleModel::Legendre, scattering_angle_error_msg);
 
-            // The energy-dependent electron scattering models apply to the two electrons that
-            // leave an electron-impact ionization event; conversely, for ionization, both
-            // electrons are emitted with the same angular model, which must be one of these
-            // or isotropic.
+            // The energy-dependent electron scattering models apply to electron-neutral
+            // elastic, excitation and ionization collisions. For ionization, both electrons
+            // are emitted with the same angular model, which must be one of these or isotropic.
             const bool is_electron_angle_model =
                 scattering_angle_model == ScatteringAngleModel::VahediSurendra ||
                 scattering_angle_model == ScatteringAngleModel::Okhrimovskyy;
@@ -170,11 +169,13 @@ namespace BinaryCollisionUtils{
                     is_electron_angle_model || scattering_angle_model == ScatteringAngleModel::Isotropic,
                     collision_name + "." + scattering_process + "_scattering_angle_model must be "
                     "isotropic, vahedisurendra or okhrimovskyy.");
-            } else {
+            } else if (process_type != ScatteringProcessType::ELASTIC &&
+                       process_type != ScatteringProcessType::EXCITATION) {
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                     !is_electron_angle_model,
                     collision_name + "." + scattering_process + "_scattering_angle_model = "
-                    "vahedisurendra or okhrimovskyy is only supported for ionization.");
+                    "vahedisurendra or okhrimovskyy is only supported for elastic, excitation "
+                    "and ionization.");
             }
 
             scattering_processes.push_back(ScatteringProcess(

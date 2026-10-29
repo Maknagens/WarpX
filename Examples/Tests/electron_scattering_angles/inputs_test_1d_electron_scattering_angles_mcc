@@ -1,0 +1,19 @@
+# base input parameters
+FILE = inputs_base_1d
+
+# Species: the argon atoms are a static background gas
+particles.species_names = electrons
+
+# Collisions
+collisions.collision_names = coll_elec
+coll_elec.type = background_mcc
+coll_elec.species = electrons
+coll_elec.background_density = gas_density
+coll_elec.background_temperature = 300. # [K]
+coll_elec.background_mass = ar_mass
+coll_elec.scattering_processes = elastic excitation1
+coll_elec.elastic_cross_section = ../../../../warpx-data/MCC_cross_sections/Ar/electron_scattering.dat
+coll_elec.elastic_scattering_angle_model = okhrimovskyy
+coll_elec.excitation1_cross_section = ../../../../warpx-data/MCC_cross_sections/Ar/excitation_1.dat
+coll_elec.excitation1_energy = 11.5 # [eV]
+coll_elec.excitation1_scattering_angle_model = vahedisurendra

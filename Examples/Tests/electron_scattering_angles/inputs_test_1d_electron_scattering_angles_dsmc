@@ -1,0 +1,27 @@
+# base input parameters
+FILE = inputs_base_1d
+
+# Species: the argon atoms are macroparticles at rest
+particles.species_names = electrons ar_neutrals
+
+ar_neutrals.charge = 0.
+ar_neutrals.mass = ar_mass
+ar_neutrals.injection_style = NRandomPerCell
+ar_neutrals.num_particles_per_cell = 400
+ar_neutrals.profile = constant
+ar_neutrals.density = gas_density
+ar_neutrals.momentum_distribution_type = constant
+ar_neutrals.ux = 0.
+ar_neutrals.uy = 0.
+ar_neutrals.uz = 0.
+
+# Collisions
+collisions.collision_names = coll_elec
+coll_elec.type = dsmc
+coll_elec.species = electrons ar_neutrals
+coll_elec.scattering_processes = elastic excitation1
+coll_elec.elastic_cross_section = ../../../../warpx-data/MCC_cross_sections/Ar/electron_scattering.dat
+coll_elec.elastic_scattering_angle_model = okhrimovskyy
+coll_elec.excitation1_cross_section = ../../../../warpx-data/MCC_cross_sections/Ar/excitation_1.dat
+coll_elec.excitation1_energy = 11.5 # [eV]
+coll_elec.excitation1_scattering_angle_model = vahedisurendra

@@ -103,6 +103,22 @@ DSMCFunc::DSMCFunc (
              "  " + collision_name + ".product_species = " + product_species_name[1] + " " + product_species_name[0]
             );
         }
+
+        // The energy-dependent electron scattering models of elastic and excitation
+        // processes describe the deflection of an electron by a heavy particle.
+        if ((process.type() == ScatteringProcessType::ELASTIC ||
+             process.type() == ScatteringProcessType::EXCITATION) &&
+            (process.executor().m_scattering_angle_model == ScatteringAngleModel::VahediSurendra ||
+             process.executor().m_scattering_angle_model == ScatteringAngleModel::Okhrimovskyy)) {
+            amrex::Vector<std::string> species_names;
+            pp_collision_name.getarr("species", species_names);
+            auto const& species1 = mypc->GetParticleContainerFromName(species_names[0]);
+            auto const& species2 = mypc->GetParticleContainerFromName(species_names[1]);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                amrex::min(species1.getMass(), species2.getMass()) <= 2._prt * PhysConst::m_e,
+                collision_name + ".scattering_angle_model = vahedisurendra or okhrimovskyy "
+                "requires one of the colliding species to be an electron species.");
+        }
     }
 
     // Store ScatteringProcess::Executor(s).

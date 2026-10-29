@@ -181,7 +181,6 @@ public:
     [[nodiscard]] amrex::ParticleReal getEnergyInputStep () const { return m_exe_h.m_dE; }
 
     [[nodiscard]] ScatteringProcessType type () const { return m_exe_h.m_type; }
-    [[nodiscard]] ScatteringAngleModel getScatteringAngleModel () const { return m_exe_h.m_scattering_angle_model; }
 
     /** Set how the energy left after an electron-impact ionization event is divided
      * between the scattered and ejected electrons.

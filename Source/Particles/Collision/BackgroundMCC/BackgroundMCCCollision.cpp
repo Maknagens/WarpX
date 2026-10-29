@@ -207,6 +207,25 @@ BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, Mult
     if (!init_flag) {
         m_mass1 = species1.getMass();
 
+        // The energy-dependent electron scattering models and the ionization energy sharing
+        // models describe collisions of electrons with the background gas.
+        if (m_mass1 > 2._prt * PhysConst::m_e) {
+            for (auto const& process : m_scattering_processes) {
+                const auto angle_model = process.executor().m_scattering_angle_model;
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    angle_model != ScatteringAngleModel::VahediSurendra &&
+                    angle_model != ScatteringAngleModel::Okhrimovskyy,
+                    "background_mcc: scattering_angle_model = vahedisurendra or okhrimovskyy "
+                    "requires the colliding species " + m_species_names[0] + " to be an electron species.");
+            }
+            for (auto const& process : m_ionization_processes) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    process.executor().hasEqualSharingIsotropicIonization(),
+                    "background_mcc: ionization_energy_sharing and ionization_scattering_angle_model "
+                    "require the colliding species " + m_species_names[0] + " to be an electron species.");
+            }
+        }
+
         // calculate maximum collision frequency without ionization
         m_nu_max = get_nu_max(m_scattering_processes);
 
@@ -250,12 +269,31 @@ BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, Mult
             m_background_mass = species1.getMass();
         }
 
+        // The cross section to provide for elastic scattering depends on its angular
+        // distribution: remind the user which one is consistent with the chosen model.
+        std::string elastic_info;
+        for (auto const& process : m_scattering_processes) {
+            if (process.type() != ScatteringProcessType::ELASTIC) { continue; }
+            const auto angle_model = process.executor().m_scattering_angle_model;
+            elastic_info += "\n     elastic scattering with "
+                + amrex::getEnumNameString(angle_model) + " angle model: ";
+            if (angle_model == ScatteringAngleModel::Isotropic) {
+                elastic_info += "the cross section should be the momentum-transfer cross section";
+            } else if (angle_model == ScatteringAngleModel::VahediSurendra ||
+                       angle_model == ScatteringAngleModel::Okhrimovskyy) {
+                elastic_info += "the cross section should be the total elastic cross section";
+            } else {
+                elastic_info += "the cross section should be consistent with this angle model";
+            }
+        }
+
         amrex::Print() << Utils::TextMsg::Info(
             "Setting up Monte-Carlo collisions for " + m_species_names[0] + " with:\n"
             + "     total non-ionization collision probability: "
             + std::to_string(m_total_collision_prob)
             + "\n     total ionization collision probability: "
             + std::to_string(m_total_collision_prob_ioniz)
+            + elastic_info
         );
 
         init_flag = true;
